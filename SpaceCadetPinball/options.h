@@ -1,4 +1,7 @@
 #pragma once
+#include "pch.h"
+#include <string>
+#include <map>
 
 enum class Msg : int;
 

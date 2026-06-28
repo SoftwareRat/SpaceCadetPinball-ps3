@@ -29,9 +29,8 @@
 #include "translations.h"
 #include "menu.h"
 
-#include <nn/act.h>
-#include <locale>
-#include <codecvt>
+// PS3: WiiU nn/act replaced with getenv
+#include <cstring>
 
 TPinballTable* pb::MainTable = nullptr;
 DatFile* pb::record_table = nullptr;
@@ -43,23 +42,21 @@ std::string pb::DatFileName, pb::BasePath;
 ImU32 pb::TextBoxColor;
 int pb::quickFlag = 0;
 TTextBox *pb::InfoTextBox, *pb::MissTextBox;
-char miiName[nn::act::MiiNameSize * 2 + 1];
+char miiName[64];
 
 
 int pb::init()
 {
-	nn::act::Initialize();
-	char16_t miiName16[nn::act::MiiNameSize];
-	nn::Result result = nn::act::GetMiiName((int16_t*)miiName16);
-
-	if (result.IsSuccess())
+	const char* user = getenv("USER");
+	if (user)
 	{
-        std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> convert; 
-		std::string miiNameStr = convert.to_bytes(miiName16);
-		strncpy(miiName, miiNameStr.c_str(), sizeof(miiName));
+		strncpy(miiName, user, sizeof(miiName) - 1);
+		miiName[sizeof(miiName) - 1] = '\0';
 	}
-
-	nn::act::Finalize();
+	else
+	{
+		strcpy(miiName, "Player");
+	}
 	float projMat[12];
 
 	if (DatFileName.empty())
@@ -702,7 +699,7 @@ void pb::PushCheat(const std::string& cheat)
 bool pb::AnyBindingMatchesInput(GameInput (&options)[3], GameInput key)
 {
 	for (auto& option : options) {
-		if (option.Type == InputTypes::Gamepad && option.Value == (VPAD_BUTTON_L | VPAD_BUTTON_ZL) && key.Value && key.Type == InputTypes::Gamepad) {
+		if (option.Type == InputTypes::Gamepad && option.Value == 0 && key.Value && key.Type == InputTypes::Gamepad) {
 		}
 		if (key.Type == option.Type && key.Value & option.Value)
 			return true;

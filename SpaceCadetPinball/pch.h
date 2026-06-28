@@ -36,21 +36,27 @@
 #include "SDL.h"
 #include <SDL_mixer.h>
 
-#include <whb/log.h>
+// --- PS3 REPLACEMENT FOR WHB LOGGING ---
+#define WHBLogInit()            printf("[INFO] Log initialized\n")
+#define WHBLogWritef(fmt, ...)  printf(fmt "\n", ##__VA_ARGS__)
+#define WHBLogPrintf(fmt, ...)  printf(fmt, ##__VA_ARGS__)
+#define WHBLogUprintf(fmt, ...) printf(fmt, ##__VA_ARGS__)
+#define WHBLogCleanUp()         printf("[INFO] Log cleaned up\n")
+// ----------------------------------------
 
 // MIX_INIT_FLUIDSYNTH was renamed to MIX_INIT_MID in SDL_mixer v2.0.2
 // Older versions of SDL_mixer did not have SDL_MIXER_VERSION_ATLEAST
 constexpr int MIX_INIT_MID_Proxy =
 #if SDL_VERSIONNUM(SDL_MIXER_MAJOR_VERSION, SDL_MIXER_MINOR_VERSION, SDL_MIXER_PATCHLEVEL) >= SDL_VERSIONNUM(2, 0, 2)
-	MIX_INIT_MID;
+    MIX_INIT_MID;
 #else
-	MIX_INIT_FLUIDSYNTH;
+    MIX_INIT_FLUIDSYNTH;
 #endif
 
 //https://github.com/ocornut/imgui 9aae45eb4a05a5a1f96be1ef37eb503a12ceb889
 #include "imgui.h"
 #include "imgui_internal.h"
-#include "imgui_impl_wiiu.h"
+//#include "imgui_impl_wiiu.h" // Deaktiviert für PS3
 #include "imgui_impl_sdlrenderer.h"
 
 typedef char* LPSTR;
@@ -64,7 +70,7 @@ constexpr char PathSeparator =
 #endif
 
 inline void WHBAssert(void* expression, const char* msg) {
-	if (!expression) WHBLogPrintf("ASSERTION FAILED: %s", msg);
+    if (!expression) WHBLogPrintf("ASSERTION FAILED: %s\n", msg);
 }
 
 /*Use (void) to silent unused warnings.*/
@@ -74,27 +80,27 @@ inline void WHBAssert(void* expression, const char* msg) {
 
 inline size_t pgm_save(int width, int height, char* data, FILE* outfile)
 {
-	size_t n = 0;
-	n += fprintf(outfile, "P5\n%d %d\n%d\n", width, height, 0xFF);
-	n += fwrite(data, 1, width * height, outfile);
-	return n;
+    size_t n = 0;
+    n += fprintf(outfile, "P5\n%d %d\n%d\n", width, height, 0xFF);
+    n += fwrite(data, 1, width * height, outfile);
+    return n;
 }
 
 inline float RandFloat()
 {
-	return static_cast<float>(std::rand() / static_cast<double>(RAND_MAX));
+    return static_cast<float>(std::rand() / static_cast<double>(RAND_MAX));
 }
 
 template <typename T>
 constexpr int Sign(T val)
 {
-	return (T(0) < val) - (val < T(0));
+    return (T(0) < val) - (val < T(0));
 }
 
 template <typename T>
 const T& Clamp(const T& n, const T& lower, const T& upper)
 {
-	return std::max(lower, std::min(n, upper));
+    return std::max(lower, std::min(n, upper));
 }
 
 // UTF-8 path adapter for fopen on Windows, implemented in SpaceCadetPinball.cpp
@@ -103,21 +109,70 @@ extern FILE* fopenu(const char* path, const char* opt);
 #else
 inline FILE* fopenu(const char* path, const char* opt)
 {
-	return fopen(path, opt);
+    return fopen(path, opt);
 }
 #endif
 
 // Platform specific data paths not found in SDL
-constexpr const char* PlatformDataPaths[2] = 
+constexpr const char* PlatformDataPaths[3] = 
 {
-	#ifdef _WIN32
-	nullptr
-	#else
-	"/usr/local/share/SpaceCadetPinball/",
-	"/usr/share/SpaceCadetPinball/"
-	#endif
+    #ifdef _WIN32
+    nullptr
+    #else
+    "/dev_hdd0/game/PINBALL01/USRDIR/",
+    "/usr/local/share/SpaceCadetPinball/",
+    "/usr/share/SpaceCadetPinball/"
+    #endif
 };
 
 constexpr float Pi = 3.14159265358979323846f;
+
+// PS3 newlib C++ stdlib workarounds - missing std::to_string / std::stof
+#if defined(__PPU__) || defined(__lv2ppu__)
+#include <sstream>
+#include <cstdlib>
+namespace std {
+    template<typename T> inline string to_string_impl(T val) {
+        ostringstream oss; oss << val; return oss.str();
+    }
+    inline string to_string(int val) { return to_string_impl(val); }
+    inline string to_string(long val) { return to_string_impl(val); }
+    inline string to_string(long long val) { return to_string_impl(val); }
+    inline string to_string(unsigned val) { return to_string_impl(val); }
+    inline string to_string(unsigned long val) { return to_string_impl(val); }
+    inline string to_string(unsigned long long val) { return to_string_impl(val); }
+    inline string to_string(float val) { return to_string_impl(val); }
+    inline string to_string(double val) { return to_string_impl(val); }
+    inline string to_string(long double val) { return to_string_impl(val); }
+    inline int stoi(const string& str, size_t* pos = nullptr, int base = 10) {
+        const char* cstr = str.c_str();
+        char* end = nullptr;
+        int result = strtol(cstr, &end, base);
+        if (pos) *pos = end - cstr;
+        return result;
+    }
+    inline long stol(const string& str, size_t* pos = nullptr, int base = 10) {
+        const char* cstr = str.c_str();
+        char* end = nullptr;
+        long result = strtol(cstr, &end, base);
+        if (pos) *pos = end - cstr;
+        return result;
+    }
+    inline float stof(const string& str, size_t* pos = nullptr) {
+        const char* cstr = str.c_str();
+        char* end = nullptr;
+        float result = strtof(cstr, &end);
+        if (pos) *pos = end - cstr;
+        return result;
+    }
+    inline double stod(const string& str, size_t* pos = nullptr) {
+        const char* cstr = str.c_str();
+        char* end = nullptr;
+        double result = strtod(cstr, &end);
+        if (pos) *pos = end - cstr;
+        return result;
+    }
+}
+#endif
 
 #endif //PCH_H

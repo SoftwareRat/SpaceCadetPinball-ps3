@@ -269,22 +269,25 @@ void gdrv::grtext_draw_ttext_in_box()
 
 void gdrv::ApplyPalette(gdrv_bitmap8& bmp)
 {
-	if (bmp.BitmapType == BitmapTypes::None)
-		return;
-	assertm(bmp.BitmapType != BitmapTypes::Spliced, "gdrv: wrong bitmap type");
-	assertm(bmp.IndexedBmpPtr != nullptr, "gdrv: non-indexed bitmap");
+    if (bmp.BitmapType == BitmapTypes::None)
+        return;
+    assertm(bmp.BitmapType != BitmapTypes::Spliced, "gdrv: wrong bitmap type");
+    assertm(bmp.IndexedBmpPtr != nullptr, "gdrv: non-indexed bitmap");
 
-	// Apply palette, flip horizontally 
-	auto dst = bmp.BmpBufPtr1;
-	for (auto y = bmp.Height - 1; y >= 0; y--)
-	{
-		auto src = reinterpret_cast<uint8_t*>(bmp.IndexedBmpPtr) + bmp.IndexedStride * y;
-		for (auto x = 0; x < bmp.Width; x++)
-		{
-			(dst++)->Color = SDL_SwapLE32(current_palette[*src++].Color);
-			//(dst++)->Color = (current_palette[*src++].Color);
-		}
-	}
+    auto dst = bmp.BmpBufPtr1;
+    for (auto y = bmp.Height - 1; y >= 0; y--)
+    {
+        // Startpunkt der aktuellen Zeile im Quellpuffer
+        auto row_start = reinterpret_cast<uint8_t*>(bmp.IndexedBmpPtr) + bmp.IndexedStride * y;
+        
+        // Wenn ECHT horizontal geflippt werden soll: fahre von rechts (Width - 1) nach links (0)
+        for (auto x = bmp.Width - 1; x >= 0; x--)
+        {
+            uint8_t src_pixel = row_start[x];
+            // Für Big-Endian PS3 ggf. SDL_SwapLE32 nutzen oder weglassen, je nach Paletten-Format:
+            (dst++)->Color = SDL_SwapLE32(current_palette[src_pixel].Color);
+        }
+    }
 }
 
 void gdrv::CreatePreview(gdrv_bitmap8& bmp)
